@@ -1,0 +1,13 @@
+{
+  "name": "basex-be",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/GregTrifan/basex-be",
+  "author": "Grigore Gabriel Trifan <trifangaby71@protonmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@now/node": "^1.8.5",
+    "ethers": "^5.6",
+    "express": "^4.18.2"
+  }
+}
