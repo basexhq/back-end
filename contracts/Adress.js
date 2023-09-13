@@ -1,0 +1,3 @@
+const ADDRESS = "0xFA8E9B2511AECfF2F1977bA4A7789fA4f8E4Af88";
+
+module.exports =  ADDRESS;
