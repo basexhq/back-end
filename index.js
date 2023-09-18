@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require('cors');
 const ethers = require("ethers");
 const ADDRESS = require("./contracts/Adress");
 const ABI = require("./contracts/ABI");
@@ -8,6 +9,7 @@ require("dotenv").config();
 
 // Initialize Express
 const app = express();
+app.use(cors());
 
 const network = "goerli";
 const provider = new ethers.providers.InfuraProvider(
