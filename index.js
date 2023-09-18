@@ -7,9 +7,8 @@ const grabEvaluations = require("./items/grabEvaluations");
 const grabReports = require("./items/grabReports");
 require("dotenv").config();
 
-// Initialize Express
 const app = express();
-app.use(cors());
+app.use(cors()); // dummy commit, push deploy
 
 const network = "goerli";
 const provider = new ethers.providers.InfuraProvider(
