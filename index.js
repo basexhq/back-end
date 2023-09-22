@@ -30,8 +30,8 @@ app.get("/reports", async (req, res) => {
 	const reportItems = await grabReports(BaseXContract);
 	res.json(reportItems);
 });
-app.listen(5000, () => {
-	console.log("Running on port 5000.");
+app.listen(3000, () => {
+	console.log("Running on port 3000.");
 });
 
 module.exports = app;
