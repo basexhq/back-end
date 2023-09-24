@@ -47,7 +47,6 @@ const createTablesSQL = `
     );
 `;
 
-
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
@@ -59,29 +58,55 @@ const provider = new ethers.providers.InfuraProvider(
 
 const BaseXContract = new ethers.Contract(ADDRESS, ABI, provider);
 
+BaseXContract.on("ItemAdded", async (eventData) => {
+  console.log("Event Name:", eventData.event);
+  console.log("Block Number:", eventData.blockNumber);
+  console.log("Transaction Hash:", eventData.transactionHash);
+
+  // Access the event parameters
+  const orgGuid = eventData.args.orgGuid;
+  const orgName = eventData.args.orgName;
+  const itemGuid = eventData.args.itemGuid;
+  const jsonIPFS = eventData.args.jsonIPFS;
+
+  console.log("orgGuid:", orgGuid);
+  console.log("orgName:", orgName);
+  console.log("itemGuid:", itemGuid);
+  console.log("jsonIPFS:", jsonIPFS);
+
+  let itemIndex = await BaseXContract.itemGuidToIndex(itemGuid);
+
+  let item = await BaseXContract.getItem(itemIndex);
+
+  console.log(item);
+
+  db.run(
+    'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [
+      item.itemGuid,
+      item.targetGuid,
+      item.orgIndex.toNumber(),
+      item.JSONIPFS,
+      item.PVT.toNumber(),
+      item.NVT.toNumber(),
+      item.approvedToKlerosAndTokensMinted
+    ],
+    function (err) {
+      if (err) {
+        console.error('Error inserting data:', err);
+      } else {
+        console.log('Data processed successfully: ' + itemsContract[i].itemGuid);
+      }
+    }
+  );
+
+});
+
 async function getData() {
 
     const itemsContract = await BaseXContract.getItems();
     console.log(itemsContract)
 
-    // let items = [];
-    // for (let i = 0; i < itemsContract.length; i++) {
-    //   let item = {
-    //     itemGuid: itemsContract[i].itemGuid,
-    //     targetGuid: itemsContract[i].targetGuid,
-    //     orgIndex: itemsContract[i].orgIndex.toNumber(),
-    //     JSONIPFS: itemsContract[i].JSONIPFS,
-    //     PVT: itemsContract[i].PVT.toNumber(),
-    //     NVT: itemsContract[i].NVT.toNumber(),
-    //     approvedToKlerosAndTokensMinted: itemsContract[i].approvedToKlerosAndTokensMinted
-    //   }
-
-    //   items.push(item);
-    // }
-
-    // console.log(items);
-
-    // Couldn't be done in a single step but for ease of debugging
     for (let i = 0; i < itemsContract.length; i++) {
       db.run(
         'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -98,7 +123,7 @@ async function getData() {
           if (err) {
             console.error('Error inserting data:', err);
           } else {
-            console.log('Data inserted successfully: ' + items[i].itemGuid);
+            console.log('Data processed successfully: ' + itemsContract[i].itemGuid);
           }
         }
       );
