@@ -12,6 +12,9 @@ async function grabEvaluations(BaseXContract) {
 			if (isOrgTarget) {
 				return false;
 			}
+
+			// console.log("https://ipfs.kleros.io/ipfs/" + ipfsHash);
+
 			return axios
 				.get(`https://ipfs.kleros.io/ipfs/${ipfsHash}`)
 				.then((response) => {
@@ -45,6 +48,14 @@ async function grabEvaluations(BaseXContract) {
 						}
 					}
 					return newEvaluation;
+				}).catch((error) => {
+					console.log("Most likely an error with the IPFS hash: " + ipfsHash);
+
+					return Promise.resolve({
+					  error: true,
+					  message: "An error occurred while fetching or processing data",
+					  errorDetails: error,
+					});
 				});
 		})
 	);
