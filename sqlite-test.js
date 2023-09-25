@@ -45,7 +45,7 @@ const createTablesSQL = `
     );
 `;
 
-const SQL_IPFS_exists = `SELECT COUNT(*) FROM JSONIPFS WHERE ipfs = ?`;
+const SQL_IPFS_get = `SELECT json FROM JSONIPFS WHERE ipfs = ?`;
 const SQL_IPFS_insert = `INSERT INTO JSONIPFS (ipfs, json) VALUES (?, ?)`;
 
 const ABI_events = [
@@ -73,108 +73,104 @@ BaseXContractEvents.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex
 
   console.log(item);
 
-  db.run(
-    'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [
+  _saveToDB_fetchIPFS(
       item.itemGuid,
       item.targetGuid,
       item.orgIndex.toNumber(),
       item.JSONIPFS,
       item.PVT.toNumber(),
       item.NVT.toNumber(),
-      item.approvedToKlerosAndTokensMinted
-    ],
-    function (err) {
-      if (err) {
-        console.error('Error inserting data:', err);
-      } else {
-        // console.log('Data processed successfully');
-      }
-    }
-  );
+      item.approvedToKlerosAndTokensMinted);
 
 });
 
+// Initial load, getting all the data
 async function getData() {
 
     const itemsContract = await BaseXContract.getItems();
     // console.log(itemsContract)
 
     for (let i = 0; i < itemsContract.length; i++) {
-      db.run(
-        'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-          itemsContract[i].itemGuid,
+      _saveToDB_fetchIPFS(itemsContract[i].itemGuid,
           itemsContract[i].targetGuid,
           itemsContract[i].orgIndex.toNumber(),
           itemsContract[i].JSONIPFS,
           itemsContract[i].PVT.toNumber(),
           itemsContract[i].NVT.toNumber(),
-          itemsContract[i].approvedToKlerosAndTokensMinted
-        ],
-        function (err) {
-          if (err) {
-            console.error('Error inserting data:', err);
-          } else {
-            // console.log('Data processed successfully: ' + itemsContract[i].itemGuid);
-          }
-        }
-      );
+          itemsContract[i].approvedToKlerosAndTokensMinted);
     }
-
 }
+
+function _saveToDB_fetchIPFS(itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) {
+  db.run(
+    'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [
+      itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted
+    ],
+    function (err) {
+      if (err) {
+        console.error('Error inserting data:', err);
+      } else {
+        // console.log('Data processed successfully: ' + itemsContract[i].itemGuid);
+      }
+    }
+  );
+
+  fetchIPFS(JSONIPFS.replace("/ipfs/", "").replace("{", "").replace("}", "")); // Annoying Kleros formatting + me messing with one item (removing {} curly braces)
+}
+
+// Could be either database or IPFS (and then save to database)
+async function fetchIPFS(hash) {
+  console.log(`Fetching IPFS: ${hash}`);
+
+  return new Promise((resolve, reject) => {
+
+    db.get(SQL_IPFS_get, [hash], (err, row) => {
+      if (err) {
+        console.error(err.message);
+      } else {
+
+        if (row) {
+          resolve(row.json); // item found, returning from DB
+        } else {
+          console.log(`IPFS hash ${hash} does not exist in the table.`);
+    
+          axios
+          .get(`https://ipfs.kleros.io/ipfs/${hash}`)
+          .then((response) => {
+            const data = response.data.values;
+
+            resolve(data); // item not found in DB, returning from IPFS and saving to DB
+        
+            db.run(SQL_IPFS_insert, [hash, JSON.stringify(data)], function(err) {
+              if (err) {
+                console.error(err.message);
+              } else {
+                console.log(`IPFS saved: ${hash}`);
+              }
+            });
+        
+          }).catch((error) => {
+            console.log(error);
+        
+            return Promise.resolve({
+              error: true,
+              message: "An error occurred while fetching or processing data",
+              errorDetails: error,
+            });
+          });
+        }
+      }
+    });
+  });
+}
+
 
 (async () => {
   await dbExecAsync(createTablesSQL);
   await getData();
 })();
 
-
-async function fetchIPFSfromKleros(JSONIPFS) {
-
-}
-
-const JSONIPFS = `QmSbjVoTeYu55yWvCu5EaXggemz48pCpVjEHS8zW9wbrBy`;
-
-
-
-db.get(SQL_IPFS_exists, [JSONIPFS], (err, row) => {
-  if (err) {
-    console.error(err.message);
-  } else {
-    const count = row['COUNT(*)'];
-    if (count === 1) {
-      console.log(`IPFS hash ${JSONIPFS} exists in the table.`);
-    } else {
-      console.log(`IPFS hash ${JSONIPFS} does not exist in the table.`);
-
-      axios
-      .get(`https://ipfs.kleros.io/ipfs/${JSONIPFS}`)
-      .then((response) => {
-        const data = response.data;
-    
-        db.run(SQL_IPFS_insert, [JSONIPFS, JSON.stringify(data)], function(err) {
-          if (err) {
-            console.error(err.message);
-          } else {
-            console.log(`Record inserted with ID: ${this.lastID}`);
-          }
-        });
-    
-      }).catch((error) => {
-        console.log(error);
-    
-        return Promise.resolve({
-          error: true,
-          message: "An error occurred while fetching or processing data",
-          errorDetails: error,
-        });
-      });
-
-
-    }
-  }
-});
 
 
 
