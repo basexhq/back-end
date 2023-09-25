@@ -39,27 +39,15 @@ async function listenForTransfers2() {
 
   const BaseXContract = new ethers.Contract(ADDRESS, 
     [
-        "event ItemAdded(string indexed orgGuid, string orgName, string indexed itemGuid, string itemJSONIPFS)"
+        "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
+        "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS)",
     ]
     , provider2);
 
 
     
   BaseXContract.on("ItemAdded", async (orgGuid, orgName, itemGuid, JSONIPFS, event) => {
-    console.log(orgName, JSONIPFS);
-
-    const decodedIndexed1 = await BaseXContract.interface.decodeEventLog(
-    "ItemAdded",
-    orgGuid
-    );
-  
-      const decodedIndexed2 = await BaseXContract.interface.decodeEventLog(
-        "ItemAdded",
-        itemGuid
-      );
-  
-      console.log("Decoded Indexed Value 1:", decodedIndexed1);
-      console.log("Decoded Indexed Value 2:", decodedIndexed2);
+    console.log(orgGuid, orgName, itemGuid, JSONIPFS);
 
   });
 
