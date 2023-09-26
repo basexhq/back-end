@@ -22,7 +22,6 @@ out/
 
 # Logs and databases
 *.log
-*.sqlite
 *.db
 
 # Environment variables
