@@ -6,7 +6,8 @@
     "author": "Grigore Gabriel Trifan <trifangaby71@protonmail.com>",
     "license": "MIT",
     "scripts": {
-        "dev": "nodemon index.js"
+        "dev": "nodemon index.js",
+        "start": "node index.js"
     },
     "dependencies": {
         "@vercel/node": "^3.0.5",
