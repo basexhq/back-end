@@ -201,6 +201,7 @@ function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWal
   await dbExecAsync(createTablesSQL);
   await getItems();
   await getOrganisations();
+  // let aaa = await grabEvaluations();
 })();
 
 
@@ -209,64 +210,74 @@ app.get("/evaluations", async (req, res) => {
 	res.json(evaluationItems);
 });
 
-async function  grabEvaluations() {
+async function grabEvaluations() {
   return new Promise((resolve, reject) => {
+    const evaluations = []; // we create array of promises to ensure all items are processed before resolving
 
+    db.all(SQL_query_evaluations, [], (err, rows) => {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return;
+      }
 
+      const promises = rows.map((row) => {
+        return new Promise((resolveRow, rejectRow) => {
+          if (!row.json) {
+            console.log("No JSON for item: " + row.itemGuid);
+            resolveRow(null); // Resolve with null for items with no JSON
+            return;
+          }
+
+          const evalData = JSON.parse(row.json);
+
+          console.log(evalData);
+
+          const newEvaluation = {
+            organisationGUID: "",
+            GUID: `${evalData.GUID}`,
+            title: `${evalData.Title}`,
+            evaluationContent: {
+              comments: evalData.Comments,
+              planetJustifications: [],
+            },
+            pvt: Number(evalData["Positive Value"] ?? 0),
+            nvt: Number(evalData["Negative Value"] ?? 0),
+            uploadDate: new Date(evalData["Start Date"]),
+            accountingPeriodStart: new Date(evalData["Start Date"]),
+            accountingPeriodEnd: new Date(evalData["End Date"]),
+            targetGUID: evalData["GUID Target"],
+          };
+
+          for (let i = 1; i <= 17; i++) {
+            const sdgValueKey = `SDG${i} Value`;
+            const sdgCommentKey = `SDG${i} Comment`;
+
+            if (evalData[sdgValueKey] || evalData[sdgCommentKey]) {
+              newEvaluation.evaluationContent.planetJustifications.push({
+                comment: evalData[sdgCommentKey],
+                percentage: parseFloat(evalData[sdgValueKey]),
+                planetImage: `/img/sdg${i}.png`,
+              });
+            }
+          }
+
+          evaluations.push(newEvaluation);
+          resolveRow(newEvaluation);
+        });
+      });
+
+      Promise.all(promises)
+        .then(() => {
+          resolve(evaluations.filter(x => x));
+        })
+        .catch((error) => {
+          reject(error);
+        });
+    });
   });
 }
 
-
-db.all(SQL_query_evaluations, [], (err, rows) => {
-  if (err) {
-    console.error(err.message);
-    return;
-  }
-
-  rows.forEach(row => {
-
-    if(!row.json) {
-      console.log("No JSON for item: " + row.itemGuid);
-      return;
-    }
-
-    const evalData = JSON.parse(row.json);
-
-    console.log(evalData);
-
-    const newEvaluation = {
-      organisationGUID: "",
-      GUID: `${evalData.GUID}`,
-      title: `${evalData.Title}`,
-      evaluationContent: {
-        comments: evalData.Comments,
-        planetJustifications: [],
-      },
-      pvt: Number(evalData["Positive Value"] ?? 0),
-      nvt: Number(evalData["Negative Value"] ?? 0),
-      uploadDate: new Date(evalData["Start Date"]),
-      accountingPeriodStart: new Date(evalData["Start Date"]),
-      accountingPeriodEnd: new Date(evalData["End Date"]),
-      targetGUID: evalData["GUID Target"],
-    };
-    for (let i = 1; i <= 17; i++) {
-      const sdgValueKey = `SDG${i} Value`;
-      const sdgCommentKey = `SDG${i} Comment`;
-
-      if (evalData[sdgValueKey] || evalData[sdgCommentKey]) {
-        newEvaluation.evaluationContent.planetJustifications.push({
-          comment: evalData[sdgCommentKey],
-          percentage: parseFloat(evalData[sdgValueKey]),
-          planetImage: `/img/sdg${i}.png`,
-        });
-      }
-    }
-    return newEvaluation;
-
-
-  });
-
-});
 
 
 
