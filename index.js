@@ -14,7 +14,7 @@ const app = express();
 app.use(cors());
 const port = process.env.PORT || 3000;
 
-const db = new sqlite3.Database('mydb.sqlite'); // Create a SQLite database connection
+const db = new sqlite3.Database('data.sqlite'); // Create a SQLite database connection
 const dbExecAsync = promisify(db.exec.bind(db)); // For chaining DB operation as promises
 
 const createTablesSQL = `
@@ -358,7 +358,6 @@ app.get("/", (req, res) => {
 	res.send("GM! /reports /evaluations /organisations");
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
