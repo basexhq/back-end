@@ -68,7 +68,7 @@ const SQL_organisations = `SELECT * FROM Organisations;`;
 
 const ABI_events = [
   "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
-  "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS)",
+  "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS, uint PVT, uint NVT)"
 ];
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -86,15 +86,12 @@ const BaseXContract = new ethers.Contract(ADDRESS, ABI, provider);
 const BaseXContractEvents = new ethers.Contract(ADDRESS, ABI_events, provider);
 
 // TODO: add PVT NVT to remove the need to fetch a new one
-BaseXContractEvents.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, event) => {
-  console.log(event)
+BaseXContractEvents.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
+  console.log("Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
 
-  let item = await BaseXContract.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely
-
-  console.log(item);
+  let item = await BaseXContract.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
 
   _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted);
-
 });
 
 async function initialLoad_processItems() {
@@ -183,6 +180,7 @@ async function initialLoad_processOrganisations() {
 }
 
 BaseXContractEvents.on("OrganisationAddedToKleros", async (orgGuid, name, klerosAddress, event) => {
+  console.log("Event listener ---> OrganisationAddedToKleros ---> " + orgGuid);
   let orgIndex = await BaseXContract.orgGuidToIndex(orgGuid);
   let org = await BaseXContract.getOrganisation(orgIndex);
   _saveOrganisationToDB(org.orgGuid, org.name, org.JSONIPFS.replace("/ipfs/", ""), org.klerosAddress, org.payoutWallet, org.PVT.toNumber(), org.NVT.toNumber(), org.PVThistorical.toNumber(), org.NVThistorical.toNumber());
@@ -196,7 +194,7 @@ function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWal
       if (err) {
         console.error('Error inserting data:', err);
       } else {
-        console.log('Data processed successfully: ' + orgGuid + " ---> " + name);
+        console.log('Org ---> data processed successfully: ' + orgGuid + " ---> " + name);
       }
     }
   );
