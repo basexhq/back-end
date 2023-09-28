@@ -55,6 +55,18 @@ const ABI = [
 			 "internalType":"string",
 			 "name":"itemJSONIPFS",
 			 "type":"string"
+		  },
+		  {
+			 "indexed":false,
+			 "internalType":"uint256",
+			 "name":"PVT",
+			 "type":"uint256"
+		  },
+		  {
+			 "indexed":false,
+			 "internalType":"uint256",
+			 "name":"NVT",
+			 "type":"uint256"
 		  }
 	   ],
 	   "name":"ItemAdded",
