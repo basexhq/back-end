@@ -96,7 +96,6 @@ const SQL_query_reports = `
 
 const SQL_organisations = `SELECT * FROM Organisations;`;
 
-
 // TODO: add PVT NVT to remove the need to fetch a new one
 BaseXContractEvents_prod.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
   console.log("PROD: Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
@@ -136,7 +135,7 @@ async function initialLoad_processOrganisations() {
     if (!orgsContract_staging[i].JSONIPFS) {
       console.log("Organisation " + orgsContract_staging[i].orgGuid + " ---> " + orgsContract_staging[i].name + " hasn't been added to Kleros yet, skipping...");
     } else {
-      _saveOrganisationToDB(orgsContract_staging[i].orgGuid, orgsContract_staging[i].name, orgsContract_staging[i].JSONIPFS.replace("/ipfs/", ""), orgsContract_staging[i].klerosAddress, orgsContract_staging[i].payoutWallet, orgsContract_staging[i].PVT.toNumber(), orgsContract_staging[i].NVT.toNumber(), orgsContract_staging[i].PVThistorical.toNumber(), orgsContract_staging[i].NVThistorical.toNumber());
+      _saveOrganisationToDB(orgsContract_staging[i].orgGuid, orgsContract_staging[i].name, orgsContract_staging[i].JSONIPFS.replace("/ipfs/", ""), orgsContract_staging[i].klerosAddress, orgsContract_staging[i].payoutWallet, orgsContract_staging[i].PVT.toNumber(), orgsContract_staging[i].NVT.toNumber(), orgsContract_staging[i].PVThistorical.toNumber(), orgsContract_staging[i].NVThistorical.toNumber(), true);
     }
   }
 }
