@@ -1,4 +1,4 @@
-const ABI = [
+const ABI_staging = [
 	{
 	   "inputs":[
 		  {
@@ -897,4 +897,4 @@ const ABI = [
 	}
  ]
 
- module.exports = ABI;
+ module.exports = ABI_staging;

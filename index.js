@@ -3,21 +3,41 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3');
 const { promisify } = require('util');
 const axios = require("axios");
-
 const bodyParser = require('body-parser');
-
 const ethers = require("ethers");
-const ADDRESS = require("./contracts/Adress");
-const ABI = require("./contracts/ABI");
-
 const app = express();
 app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 const port = process.env.PORT || 3000;
 
-const db = new sqlite3.Database('data.sqlite'); // Create a SQLite database connection
-const dbExecAsync = promisify(db.exec.bind(db)); // For chaining DB operation as promises
+// FYI: By default we use prod. When passing additional flag "true" it means staging.
 
-const createTablesSQL = `
+const ADDRESS_prod    = require("./contracts/Address-prod");
+const ADDRESS_staging = require("./contracts/Address-staging");
+
+const ABI_prod    = require("./contracts/ABI-prod");
+const ABI_staging = require("./contracts/ABI-staging");
+
+const network = "goerli";
+const provider = new ethers.providers.InfuraProvider(
+	network,
+	process.env.INFURA_KEY
+);
+
+const BaseXContract_prod       = new ethers.Contract(ADDRESS_prod, ABI, provider);
+const BaseXContractEvents_prod = new ethers.Contract(ADDRESS_prod, ABI_events, provider);
+
+const BaseXContract_staging       = new ethers.Contract(ADDRESS_staging, ABI, provider);
+const BaseXContractEvents_staging = new ethers.Contract(ADDRESS_staging, ABI_events, provider);
+
+const db_prod    = new sqlite3.Database('data_prod.sqlite');
+const db_staging = new sqlite3.Database('data_staging.sqlite');
+
+const dbProdExecAsync    = promisify(db.exec.bind(db_prod)); // For chaining DB operation as promises
+const dbStagingExecAsync = promisify(db.exec.bind(db_staging));
+
+const SQL_create_table = `
     CREATE TABLE IF NOT EXISTS Organisations (
         orgGuid TEXT PRIMARY KEY,
         name TEXT,
@@ -66,24 +86,11 @@ const SQL_query_reports = `
 
 const SQL_organisations = `SELECT * FROM Organisations;`;
 
+// Some quirky issue: https://github.com/ethers-io/ethers.js/discussions/4387 (hard to tell why it is required, a dedicated format for events)
 const ABI_events = [
   "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
   "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS, uint PVT, uint NVT)"
 ];
-
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-const network = "goerli";
-const provider = new ethers.providers.InfuraProvider(
-	network,
-	process.env.INFURA_KEY
-);
-
-const BaseXContract = new ethers.Contract(ADDRESS, ABI, provider);
-const BaseXContractEvents = new ethers.Contract(ADDRESS, ABI_events, provider);
 
 // TODO: add PVT NVT to remove the need to fetch a new one
 BaseXContractEvents.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
@@ -201,10 +208,9 @@ function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWal
 };
 
 (async () => {
-  await dbExecAsync(createTablesSQL);
+  await dbExecAsync(SQL_create_table);
   await initialLoad_processItems();
   await initialLoad_processOrganisations();
-  // let aaa = await grabEvaluations();
 })();
 
 app.get("/reports", async (req, res) => {
@@ -219,6 +225,11 @@ app.get("/evaluations", async (req, res) => {
 
 app.get("/organisations", async (req, res) => {
 	const organisations = await grabOrganisations();
+	res.json(organisations);
+});
+
+app.get("/organisations_staging", async (req, res) => {
+	const organisations = await grabOrganisations(true);
 	res.json(organisations);
 });
 
@@ -339,7 +350,7 @@ async function grabReports() {
   });
 }
 
-async function grabOrganisations() {
+async function grabOrganisations(staging = false) {
   return new Promise((resolve, reject) => {
 
     db.all(SQL_organisations, [], (err, rows) => {
