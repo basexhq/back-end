@@ -11,7 +11,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 const port = process.env.PORT || 3000;
 
-// FYI: By default we use prod. When passing additional flag "true" it means staging.
+// FYI: By default we use prod ---> `staging = false` ---> when passing additional flag "true" it means staging.
 
 const ADDRESS_prod    = require("./contracts/Address-prod");
 const ADDRESS_staging = require("./contracts/Address-staging");
@@ -19,23 +19,33 @@ const ADDRESS_staging = require("./contracts/Address-staging");
 const ABI_prod    = require("./contracts/ABI-prod");
 const ABI_staging = require("./contracts/ABI-staging");
 
+// Some quirky issue: https://github.com/ethers-io/ethers.js/discussions/4387 (hard to tell why it is required, a dedicated format for events)
+const ABI_events_prod = [
+  "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
+  "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS, uint PVT, uint NVT)"
+];
+const ABI_events_staging = [ // YAGNI vs consistency ---> consistency wins :) (currently both versions of the events are the same, may change in the future)
+  "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
+  "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS, uint PVT, uint NVT)"
+];
+
 const network = "goerli";
 const provider = new ethers.providers.InfuraProvider(
 	network,
 	process.env.INFURA_KEY
 );
 
-const BaseXContract_prod       = new ethers.Contract(ADDRESS_prod, ABI, provider);
-const BaseXContractEvents_prod = new ethers.Contract(ADDRESS_prod, ABI_events, provider);
+const BaseXContract_prod       = new ethers.Contract(ADDRESS_prod, ABI_prod, provider);
+const BaseXContractEvents_prod = new ethers.Contract(ADDRESS_prod, ABI_events_prod, provider);
 
-const BaseXContract_staging       = new ethers.Contract(ADDRESS_staging, ABI, provider);
-const BaseXContractEvents_staging = new ethers.Contract(ADDRESS_staging, ABI_events, provider);
+const BaseXContract_staging       = new ethers.Contract(ADDRESS_staging, ABI_staging, provider);
+const BaseXContractEvents_staging = new ethers.Contract(ADDRESS_staging, ABI_events_staging, provider);
 
 const db_prod    = new sqlite3.Database('data_prod.sqlite');
 const db_staging = new sqlite3.Database('data_staging.sqlite');
 
-const dbProdExecAsync    = promisify(db.exec.bind(db_prod)); // For chaining DB operation as promises
-const dbStagingExecAsync = promisify(db.exec.bind(db_staging));
+const dbExecAsync_prod    = promisify(db_prod.exec.bind(db_prod)); // For chaining DB operation as promises
+const dbExecAsync_staging = promisify(db_staging.exec.bind(db_staging));
 
 const SQL_create_table = `
     CREATE TABLE IF NOT EXISTS Organisations (
@@ -86,18 +96,16 @@ const SQL_query_reports = `
 
 const SQL_organisations = `SELECT * FROM Organisations;`;
 
-// Some quirky issue: https://github.com/ethers-io/ethers.js/discussions/4387 (hard to tell why it is required, a dedicated format for events)
-const ABI_events = [
-  "event OrganisationAddedToKleros(string orgGuid, string name, address klerosAddress)",
-  "event ItemAdded(string orgGuid, string orgName, string itemGuid, uint itemIndex, string itemName, string itemJSONIPFS, uint PVT, uint NVT)"
-];
 
 // TODO: add PVT NVT to remove the need to fetch a new one
-BaseXContractEvents.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
+BaseXContractEvents_prod.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
   console.log("Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
-
-  let item = await BaseXContract.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
-
+  let item = await BaseXContract_prod.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
+  _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted);
+});
+BaseXContractEvents_staging.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
+  console.log("Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
+  let item = await BaseXContract_prod.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
   _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted);
 });
 
@@ -186,14 +194,23 @@ async function initialLoad_processOrganisations() {
   }
 }
 
-BaseXContractEvents.on("OrganisationAddedToKleros", async (orgGuid, name, klerosAddress, event) => {
+BaseXContractEvents_prod.on("OrganisationAddedToKleros", async (orgGuid, name, klerosAddress, event) => {
   console.log("Event listener ---> OrganisationAddedToKleros ---> " + orgGuid);
-  let orgIndex = await BaseXContract.orgGuidToIndex(orgGuid);
-  let org = await BaseXContract.getOrganisation(orgIndex);
+  let orgIndex = await BaseXContract_prod.orgGuidToIndex(orgGuid);
+  let org = await BaseXContract_prod.getOrganisation(orgIndex);
   _saveOrganisationToDB(org.orgGuid, org.name, org.JSONIPFS.replace("/ipfs/", ""), org.klerosAddress, org.payoutWallet, org.PVT.toNumber(), org.NVT.toNumber(), org.PVThistorical.toNumber(), org.NVThistorical.toNumber());
 });
+BaseXContractEvents_staging.on("OrganisationAddedToKleros", async (orgGuid, name, klerosAddress, event) => {
+  console.log("Event listener ---> OrganisationAddedToKleros ---> " + orgGuid);
+  let orgIndex = await BaseXContract_staging.orgGuidToIndex(orgGuid);
+  let org = await BaseXContract_staging.getOrganisation(orgIndex);
+  _saveOrganisationToDB(org.orgGuid, org.name, org.JSONIPFS.replace("/ipfs/", ""), org.klerosAddress, org.payoutWallet, org.PVT.toNumber(), org.NVT.toNumber(), org.PVThistorical.toNumber(), org.NVThistorical.toNumber(), true);
+});
 
-function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWallet, PVT, NVT, PVThistorical, NVThistorical) {
+function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWallet, PVT, NVT, PVThistorical, NVThistorical, staging = false) {
+
+  const db = staging ? db_staging : db_prod;
+
   db.run(
     'INSERT OR IGNORE INTO Organisations (orgGuid, name, JSONIPFS, klerosAddress, payoutWallet, PVT, NVT, PVThistorical, NVThistorical) VALUES (?, ?, ? ,? ,? ,? ,? ,? ,?)',
     [orgGuid, name, JSONIPFS, klerosAddress, payoutWallet, PVT, NVT, PVThistorical, NVThistorical],
@@ -208,7 +225,8 @@ function _saveOrganisationToDB(orgGuid, name, JSONIPFS, klerosAddress, payoutWal
 };
 
 (async () => {
-  await dbExecAsync(SQL_create_table);
+  await dbExecAsync_prod(SQL_create_table);
+  await dbExecAsync_staging(SQL_create_table);
   await initialLoad_processItems();
   await initialLoad_processOrganisations();
 })();
@@ -217,9 +235,18 @@ app.get("/reports", async (req, res) => {
 	const reportItems = await grabReports();
 	res.json(reportItems);
 });
+app.get("/reports_staging", async (req, res) => {
+	const reportItems = await grabReports(true);
+	res.json(reportItems);
+});
 
 app.get("/evaluations", async (req, res) => {
 	const evaluationItems = await grabEvaluations();
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging", async (req, res) => {
+	const evaluationItems = await grabEvaluations(true);
 	res.json(evaluationItems);
 });
 
@@ -233,10 +260,11 @@ app.get("/organisations_staging", async (req, res) => {
 	res.json(organisations);
 });
 
-async function grabEvaluations() {
+async function grabEvaluations(staging = false) {
   return new Promise((resolve, reject) => {
     const evaluations = []; // we create array of promises to ensure all items are processed before resolving
 
+    const db = staging ? db_staging : db_prod;
     db.all(SQL_query_evaluations, [], (err, rows) => {
       if (err) {
         console.error(err.message);
@@ -299,10 +327,11 @@ async function grabEvaluations() {
   });
 }
 
-async function grabReports() {
+async function grabReports(staging = false) {
   return new Promise((resolve, reject) => {
     const evaluations = []; // we create array of promises to ensure all items are processed before resolving
 
+    const db = staging ? db_staging : db_prod;
     db.all(SQL_query_reports, [], (err, rows) => {
       if (err) {
         console.error(err.message);
@@ -351,8 +380,9 @@ async function grabReports() {
 }
 
 async function grabOrganisations(staging = false) {
-  return new Promise((resolve, reject) => {
 
+  return new Promise((resolve, reject) => {
+    const db = staging ? db_staging : db_prod;
     db.all(SQL_organisations, [], (err, rows) => {
       if (err) {
         reject(err);
@@ -363,8 +393,10 @@ async function grabOrganisations(staging = false) {
   });
 }
 
+// STARTING THE APP
+
 app.get("/", (req, res) => {
-	res.send("GM! /reports /evaluations /organisations");
+	res.send("GM! /reports /evaluations /organisations /reports_staging /evaluations_staging /organisations_staging");
 });
 
 app.listen(port, () => {
