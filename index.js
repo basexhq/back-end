@@ -99,27 +99,51 @@ const SQL_organisations = `SELECT * FROM Organisations;`;
 
 // TODO: add PVT NVT to remove the need to fetch a new one
 BaseXContractEvents_prod.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
-  console.log("Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
+  console.log("PROD: Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
   let item = await BaseXContract_prod.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
   _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted);
 });
 BaseXContractEvents_staging.on("ItemAdded", async (orgGuid, orgName, itemGuid, itemIndex, itemName, JSONIPFS, PVT, NVT, event) => {
-  console.log("Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
-  let item = await BaseXContract_prod.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
-  _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted);
+  console.log("STAGING: Event listener ---> ItemAdded ---> itemGuid ---> " + itemGuid);
+  let item = await BaseXContract_staging.getItem(itemIndex); // TODO: once we have PVT NVT we can skip this entirely BUT maybe just keep it for now
+  _saveItemToDB_fetchIPFS(item.itemGuid, item.targetGuid, item.orgIndex.toNumber(), item.JSONIPFS, item.PVT.toNumber(), item.NVT.toNumber(), item.approvedToKlerosAndTokensMinted, true);
 });
 
 async function initialLoad_processItems() {
+    const itemsContract_prod = await BaseXContract_prod.getItems();
+    for (let i = 0; i < itemsContract_prod.length; i++) {
+      _saveItemToDB_fetchIPFS(itemsContract_prod[i].itemGuid, itemsContract_prod[i].targetGuid, itemsContract_prod[i].orgIndex.toNumber(), itemsContract_prod[i].JSONIPFS, itemsContract_prod[i].PVT.toNumber(), itemsContract_prod[i].NVT.toNumber(), itemsContract_prod[i].approvedToKlerosAndTokensMinted);
+    }
 
-    const itemsContract = await BaseXContract.getItems();
-    // console.log(itemsContract)
-
-    for (let i = 0; i < itemsContract.length; i++) {
-      _saveItemToDB_fetchIPFS(itemsContract[i].itemGuid, itemsContract[i].targetGuid, itemsContract[i].orgIndex.toNumber(), itemsContract[i].JSONIPFS, itemsContract[i].PVT.toNumber(), itemsContract[i].NVT.toNumber(), itemsContract[i].approvedToKlerosAndTokensMinted);
+    const itemsContract_staging = await BaseXContract_staging.getItems();
+    for (let i = 0; i < itemsContract_staging.length; i++) {
+      _saveItemToDB_fetchIPFS(itemsContract_staging[i].itemGuid, itemsContract_staging[i].targetGuid, itemsContract_staging[i].orgIndex.toNumber(), itemsContract_staging[i].JSONIPFS, itemsContract_staging[i].PVT.toNumber(), itemsContract_staging[i].NVT.toNumber(), itemsContract_staging[i].approvedToKlerosAndTokensMinted, true);
     }
 }
 
-function _saveItemToDB_fetchIPFS(itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) {
+async function initialLoad_processOrganisations() {
+  const orgsContract_prod = await BaseXContract_prod.getOrganisations();
+  for (let i = 0; i < orgsContract_prod.length; i++) {
+    if (!orgsContract_prod[i].JSONIPFS) {
+      console.log("Organisation " + orgsContract_prod[i].orgGuid + " ---> " + orgsContract_prod[i].name + " hasn't been added to Kleros yet, skipping...");
+    } else {
+      _saveOrganisationToDB(orgsContract_prod[i].orgGuid, orgsContract_prod[i].name, orgsContract_prod[i].JSONIPFS.replace("/ipfs/", ""), orgsContract_prod[i].klerosAddress, orgsContract_prod[i].payoutWallet, orgsContract_prod[i].PVT.toNumber(), orgsContract_prod[i].NVT.toNumber(), orgsContract_prod[i].PVThistorical.toNumber(), orgsContract_prod[i].NVThistorical.toNumber());
+    }
+  }
+
+  const orgsContract_staging = await BaseXContract_staging.getOrganisations();
+  for (let i = 0; i < orgsContract_staging.length; i++) {
+    if (!orgsContract_staging[i].JSONIPFS) {
+      console.log("Organisation " + orgsContract_staging[i].orgGuid + " ---> " + orgsContract_staging[i].name + " hasn't been added to Kleros yet, skipping...");
+    } else {
+      _saveOrganisationToDB(orgsContract_staging[i].orgGuid, orgsContract_staging[i].name, orgsContract_staging[i].JSONIPFS.replace("/ipfs/", ""), orgsContract_staging[i].klerosAddress, orgsContract_staging[i].payoutWallet, orgsContract_staging[i].PVT.toNumber(), orgsContract_staging[i].NVT.toNumber(), orgsContract_staging[i].PVThistorical.toNumber(), orgsContract_staging[i].NVThistorical.toNumber());
+    }
+  }
+}
+
+function _saveItemToDB_fetchIPFS(itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted, staging = false) {
+
+  const db = staging ? db_staging : db_prod;
   db.run(
     'INSERT OR IGNORE INTO Items (itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, NVT, approvedToKlerosAndTokensMinted) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [itemGuid, targetGuid, orgIndex, JSONIPFS.replace("/ipfs/", ""), PVT, NVT, approvedToKlerosAndTokensMinted],
@@ -132,14 +156,15 @@ function _saveItemToDB_fetchIPFS(itemGuid, targetGuid, orgIndex, JSONIPFS, PVT, 
     }
   );
 
-  fetchIPFS(JSONIPFS.replace("/ipfs/", "").replace("{", "").replace("}", "")); // Annoying Kleros formatting + me messing with one item (removing {} curly braces)
+  fetchIPFS(JSONIPFS.replace("/ipfs/", "").replace("{", "").replace("}", ""), staging); // Annoying Kleros formatting + me messing with one item (removing {} curly braces)
 }
 
 // Could be either database or IPFS (and then save to database)
-async function fetchIPFS(hash) {
+async function fetchIPFS(hash, staging = false) {
   
   return new Promise((resolve, reject) => {
 
+    const db = staging ? db_staging : db_prod;
     db.get(SQL_IPFS_get, [hash], (err, row) => {
       if (err) {
         console.error(err.message);
@@ -179,19 +204,6 @@ async function fetchIPFS(hash) {
       }
     });
   });
-}
-
-async function initialLoad_processOrganisations() {
-  const orgsContract = await BaseXContract.getOrganisations();
-  for (let i = 0; i < orgsContract.length; i++) {
-
-    if (!orgsContract[i].JSONIPFS) {
-      console.log("Organisation " + orgsContract[i].orgGuid + " ---> " + orgsContract[i].name + " hasn't been added to Kleros yet, skipping...");
-    } else {
-      _saveOrganisationToDB(orgsContract[i].orgGuid, orgsContract[i].name, orgsContract[i].JSONIPFS.replace("/ipfs/", ""), orgsContract[i].klerosAddress, orgsContract[i].payoutWallet, orgsContract[i].PVT.toNumber(), orgsContract[i].NVT.toNumber(), orgsContract[i].PVThistorical.toNumber(), orgsContract[i].NVThistorical.toNumber());
-    }
-
-  }
 }
 
 BaseXContractEvents_prod.on("OrganisationAddedToKleros", async (orgGuid, name, klerosAddress, event) => {
@@ -396,7 +408,7 @@ async function grabOrganisations(staging = false) {
 // STARTING THE APP
 
 app.get("/", (req, res) => {
-	res.send("GM! /reports /evaluations /organisations /reports_staging /evaluations_staging /organisations_staging");
+	res.send("<h1>GM!</h1><br>/reports /evaluations /organisations<br>/reports_staging /evaluations_staging /organisations_staging");
 });
 
 app.listen(port, () => {
