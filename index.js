@@ -465,6 +465,21 @@ app.get("/evaluations_staging", async (req, res) => {
 	res.json(evaluationItems);
 });
 
+app.get("/evaluations_staging/ebf", async (req, res) => {
+	const evaluationItems = await grabEvaluations(true, "ebf");
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging/sdg", async (req, res) => {
+	const evaluationItems = await grabEvaluations(true, "sdg");
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging/planetary", async (req, res) => {
+	const evaluationItems = await grabEvaluations(true, "planetary");
+	res.json(evaluationItems);
+});
+
 app.get("/organisations", async (req, res) => {
 	const organisations = await grabOrganisations();
 	res.json(organisations);
