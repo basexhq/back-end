@@ -251,13 +251,33 @@ app.get("/reports_staging", async (req, res) => {
 	res.json(reportItems);
 });
 
-app.get("/evaluations", async (req, res) => {
-	const evaluationItems = await grabEvaluations();
+app.get("/evaluations/ebf", async (req, res) => {
+	const evaluationItems = await grabEvaluations("ebf");
 	res.json(evaluationItems);
 });
 
-app.get("/evaluations_staging", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true);
+app.get("/evaluations/sdg", async (req, res) => {
+	const evaluationItems = await grabEvaluations("sdg");
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations/planetary", async (req, res) => {
+	const evaluationItems = await grabEvaluations("planetary");
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging/ebf", async (req, res) => {
+	const evaluationItems = await grabEvaluations("ebf", true);
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging/sdg", async (req, res) => {
+	const evaluationItems = await grabEvaluations("sdg", true);
+	res.json(evaluationItems);
+});
+
+app.get("/evaluations_staging/planetary", async (req, res) => {
+	const evaluationItems = await grabEvaluations("planetary", true);
 	res.json(evaluationItems);
 });
 
@@ -271,7 +291,7 @@ app.get("/organisations_staging", async (req, res) => {
 	res.json(organisations);
 });
 
-async function grabEvaluations(staging = false) {
+async function grabEvaluations(justificationType, staging = false) {
   return new Promise((resolve, reject) => {
     const evaluations = []; // we create array of promises to ensure all items are processed before resolving
 
@@ -292,6 +312,10 @@ async function grabEvaluations(staging = false) {
           }
 
           const evalData = JSON.parse(row.json);
+          if ((evalData.justificationType !== justificationType) || !justificationType) {
+						resolveRow(null); // Resolve with null for items with no JSON
+						return;
+					}
 
           const newEvaluation = {
             organisationGUID: "",
@@ -309,18 +333,35 @@ async function grabEvaluations(staging = false) {
             targetGUID: evalData["GUID Target"],
           };
 
-          for (let i = 1; i <= 17; i++) {
-            const sdgValueKey = `SDG${i} Value`;
-            const sdgCommentKey = `SDG${i} Comment`;
+          let itemLimit;
+					switch (newEvaluation.justificationType) {
+						case "EBF":
+							itemLimit = 6;
+							break;
+						case "SDG":
+							itemLimit = 17;
+							break;
+						case "Planetary Boundaries":
+							itemLimit = 8;
+							break;
+					}
+					for (let i = 1; i <= itemLimit; i++) {
+						const sdgValueKey = `SDG${i} Value`;
+						const sdgCommentKey = `SDG${i} Comment`;
 
-            if (evalData[sdgValueKey] || evalData[sdgCommentKey]) {
-              newEvaluation.evaluationContent.planetJustifications.push({
-                comment: evalData[sdgCommentKey],
-                percentage: parseFloat(evalData[sdgValueKey]),
-                planetImage: `/img/sdg${i}.png`,
-              });
-            }
-          }
+						if (evalData[sdgValueKey] || evalData[sdgCommentKey]) {
+							newEvaluation.evaluationContent.planetJustifications.push({
+								comment: evalData[sdgCommentKey],
+								percentage: parseFloat(evalData[sdgValueKey]),
+								planetImage:
+									itemLimit === 17
+										? `/img/sdg${i}.png`
+										: itemLimit === 6
+										? `/img/ebfs/ebf-${i}.svg`
+										: "planetary",
+							});
+						}
+					}
 
           evaluations.push(newEvaluation);
           resolveRow(newEvaluation);
