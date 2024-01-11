@@ -446,17 +446,17 @@ app.get("/evaluations", async (req, res) => {
 });
 
 app.get("/evaluations/ebf", async (req, res) => {
-	const evaluationItems = await grabEvaluations("ebf");
+	const evaluationItems = await grabEvaluations("EBF");
 	res.json(evaluationItems);
 });
 
 app.get("/evaluations/sdg", async (req, res) => {
-	const evaluationItems = await grabEvaluations("sdg");
+	const evaluationItems = await grabEvaluations("SDG");
 	res.json(evaluationItems);
 });
 
 app.get("/evaluations/planetary", async (req, res) => {
-	const evaluationItems = await grabEvaluations("planetary");
+	const evaluationItems = await grabEvaluations("Planetary Boundaries");
 	res.json(evaluationItems);
 });
 
@@ -465,24 +465,24 @@ app.get("/evaluations_staging", async (req, res) => {
 	res.json(evaluationItems);
 });
 
+app.get("/organisations", async (req, res) => {
+	const organisations = await grabOrganisations();
+	res.json(organisations);
+});
+
 app.get("/evaluations_staging/ebf", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "ebf");
+	const evaluationItems = await grabEvaluations(true, "EBF");
 	res.json(evaluationItems);
 });
 
 app.get("/evaluations_staging/sdg", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "sdg");
+	const evaluationItems = await grabEvaluations(true, "SDG");
 	res.json(evaluationItems);
 });
 
 app.get("/evaluations_staging/planetary", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "planetary");
+	const evaluationItems = await grabEvaluations(true, "Planetary Boundaries");
 	res.json(evaluationItems);
-});
-
-app.get("/organisations", async (req, res) => {
-	const organisations = await grabOrganisations();
-	res.json(organisations);
 });
 
 app.get("/organisations_staging", async (req, res) => {
@@ -511,10 +511,8 @@ async function grabEvaluations(staging = false, justificationType) {
 					}
 
 					const evalData = JSON.parse(row.json);
-					if (
-						evalData.justificationType !== justificationType ||
-						!justificationType
-					) {
+					console.log(evalData);
+					if ((evalData.justificationType ?? "SDG") !== justificationType) {
 						resolveRow(null); // Resolve with null for items with no JSON
 						return;
 					}
@@ -557,7 +555,7 @@ async function grabEvaluations(staging = false, justificationType) {
 								percentage: parseFloat(evalData[sdgValueKey]),
 								planetImage:
 									itemLimit === 17
-										? `/img/sdg${i}.png`
+										? `/img/sdgs/sdg${i}.png`
 										: itemLimit === 6
 										? `/img/ebfs/ebf-${i}.svg`
 										: "planetary",
