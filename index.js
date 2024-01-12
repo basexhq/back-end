@@ -5,6 +5,7 @@ const { promisify } = require("util");
 const axios = require("axios");
 const bodyParser = require("body-parser");
 const ethers = require("ethers");
+const { planetaryBoundaries } = require("./utils/categoriesEval");
 const app = express();
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -559,6 +560,8 @@ async function grabEvaluations(staging = false, justificationType) {
 										: itemLimit === 6
 										? `/img/ebfs/ebf-${i}.svg`
 										: "planetary",
+								planetaryBoundary:
+									itemLimit === 8 ? planetaryBoundaries[i - 1] : "",
 							});
 						}
 					}
