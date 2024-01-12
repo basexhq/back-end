@@ -512,7 +512,7 @@ async function grabEvaluations(staging = false, justificationType) {
 					}
 
 					const evalData = JSON.parse(row.json);
-					console.log(evalData);
+					// console.log(evalData);
 					if ((evalData.justificationType ?? "SDG") !== justificationType) {
 						resolveRow(null); // Resolve with null for items with no JSON
 						return;
