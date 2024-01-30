@@ -33,3 +33,6 @@ out/
 .DS_Store
 Thumbs.db
 .vercel
+
+# DBs
+*.sqlite
