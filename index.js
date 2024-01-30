@@ -5,7 +5,6 @@ const { promisify } = require("util");
 const axios = require("axios");
 const bodyParser = require("body-parser");
 const ethers = require("ethers");
-const { planetaryBoundaries } = require("./utils/categoriesEval");
 const app = express();
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -19,6 +18,7 @@ const ADDRESS_staging = require("./contracts/Address-staging");
 
 const ABI_prod = require("./contracts/ABI-prod");
 const ABI_staging = require("./contracts/ABI-staging");
+const evaluationController = require("./controllers/evaluationController");
 
 // Some quirky issue: https://github.com/ethers-io/ethers.js/discussions/4387 (hard to tell why it is required, a dedicated format for events)
 const ABI_events_prod = [
@@ -432,6 +432,8 @@ function _saveOrganisationToDB(
 	await initialLoad_processOrganisations();
 })();
 
+app.use("/", evaluationController);
+
 app.get("/reports", async (req, res) => {
 	const reportItems = await grabReports();
 	res.json(reportItems);
@@ -441,146 +443,15 @@ app.get("/reports_staging", async (req, res) => {
 	res.json(reportItems);
 });
 
-app.get("/evaluations", async (req, res) => {
-	const evaluationItems = await grabEvaluations();
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations/ebf", async (req, res) => {
-	const evaluationItems = await grabEvaluations("EBF");
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations/sdg", async (req, res) => {
-	const evaluationItems = await grabEvaluations("SDG");
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations/planetary", async (req, res) => {
-	const evaluationItems = await grabEvaluations("Planetary Boundaries");
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations_staging", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true);
-	res.json(evaluationItems);
-});
-
 app.get("/organisations", async (req, res) => {
 	const organisations = await grabOrganisations();
 	res.json(organisations);
-});
-
-app.get("/evaluations_staging/ebf", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "EBF");
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations_staging/sdg", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "SDG");
-	res.json(evaluationItems);
-});
-
-app.get("/evaluations_staging/planetary", async (req, res) => {
-	const evaluationItems = await grabEvaluations(true, "Planetary Boundaries");
-	res.json(evaluationItems);
 });
 
 app.get("/organisations_staging", async (req, res) => {
 	const organisations = await grabOrganisations(true);
 	res.json(organisations);
 });
-
-async function grabEvaluations(staging = false, justificationType) {
-	return new Promise((resolve, reject) => {
-		const evaluations = []; // we create array of promises to ensure all items are processed before resolving
-
-		const db = staging ? db_staging : db_prod;
-		db.all(SQL_query_evaluations, [], (err, rows) => {
-			if (err) {
-				console.error(err.message);
-				reject(err);
-				return;
-			}
-
-			const promises = rows.map((row) => {
-				return new Promise((resolveRow, rejectRow) => {
-					if (!row.json) {
-						console.log("Grab evaluations: No JSON for item: " + row.itemGuid);
-						resolveRow(null); // Resolve with null for items with no JSON
-						return;
-					}
-
-					const evalData = JSON.parse(row.json);
-					// console.log(evalData);
-					if ((evalData.justificationType ?? "SDG") !== justificationType) {
-						resolveRow(null); // Resolve with null for items with no JSON
-						return;
-					}
-
-					const newEvaluation = {
-						organisationGUID: "",
-						GUID: `${evalData.GUID}`,
-						title: `${evalData.Title}`,
-						evaluationContent: {
-							comments: evalData.Comments,
-							planetJustifications: [],
-						},
-						justificationType: evalData.justificationType ?? "SDG",
-						pvt: Number(evalData["Positive Value"] ?? 0),
-						nvt: Number(evalData["Negative Value"] ?? 0),
-						uploadDate: new Date(evalData["Start Date"]),
-						accountingPeriodStart: new Date(evalData["Start Date"]),
-						accountingPeriodEnd: new Date(evalData["End Date"]),
-						targetGUID: evalData["GUID Target"],
-					};
-					let itemLimit;
-					switch (newEvaluation.justificationType) {
-						case "EBF":
-							itemLimit = 6;
-							break;
-						case "SDG":
-							itemLimit = 17;
-							break;
-						case "Planetary Boundaries":
-							itemLimit = 8;
-							break;
-					}
-					for (let i = 1; i <= itemLimit; i++) {
-						const sdgValueKey = `SDG${i} Value`;
-						const sdgCommentKey = `SDG${i} Comment`;
-
-						if (evalData[sdgValueKey] || evalData[sdgCommentKey]) {
-							newEvaluation.evaluationContent.planetJustifications.push({
-								comment: evalData[sdgCommentKey],
-								percentage: parseFloat(evalData[sdgValueKey]),
-								planetImage:
-									itemLimit === 17
-										? `/img/sdgs/sdg${i}.png`
-										: itemLimit === 6
-										? `/img/ebfs/ebf-${i}.svg`
-										: "planetary",
-								planetaryBoundary:
-									itemLimit === 8 ? planetaryBoundaries[i - 1] : "",
-							});
-						}
-					}
-
-					evaluations.push(newEvaluation);
-					resolveRow(newEvaluation);
-				});
-			});
-
-			Promise.all(promises)
-				.then(() => {
-					resolve(evaluations.filter((x) => x)); // Some rows that resolved with null (no JSON) are filtered out
-				})
-				.catch((error) => {
-					reject(error);
-				});
-		});
-	});
-}
 
 async function grabReports(staging = false) {
 	return new Promise((resolve, reject) => {
