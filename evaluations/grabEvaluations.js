@@ -60,6 +60,8 @@ async function grabEvaluations(staging = false) {
 						},
 						pvt: Number(evalData["Positive Value"] ?? 0),
 						nvt: Number(evalData["Negative Value"] ?? 0),
+						co2: Number(evalData.CO2 ?? 0),
+						h2o: Number(evalData.H2O ?? 0),
 						uploadDate: new Date(
 							evalData["Upload Date"] ?? evalData["Start Date"]
 						),
