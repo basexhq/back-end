@@ -481,7 +481,7 @@ async function grabReports(staging = false) {
 
 						title: reportData.Title, // These below come from IPFS
 						comments: reportData.Comments,
-						uploadDate: new Date(reportData["Start Date"]),
+						uploadDate: new Date(reportData["Upload Date"]),
 						accountingPeriodStart: new Date(reportData["Start Date"]),
 						accountingPeriodEnd: new Date(reportData["End Date"]),
 						source: reportData.Source,
