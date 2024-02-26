@@ -18,6 +18,7 @@ const ADDRESS_staging = require("./contracts/Address-staging");
 
 const ABI_prod = require("./contracts/ABI-prod");
 const ABI_staging = require("./contracts/ABI-staging");
+const stripeController = require("./controllers/stripeController");
 const evaluationController = require("./controllers/evaluationController");
 
 // Some quirky issue: https://github.com/ethers-io/ethers.js/discussions/4387 (hard to tell why it is required, a dedicated format for events)
@@ -433,6 +434,8 @@ function _saveOrganisationToDB(
 })();
 
 app.use("/", evaluationController);
+
+app.use("/", stripeController);
 
 app.get("/reports", async (req, res) => {
 	const reportItems = await grabReports();
