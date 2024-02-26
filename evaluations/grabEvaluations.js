@@ -1,5 +1,5 @@
 const sqlite3 = require("sqlite3");
-const { planetaryBoundaries } = require("../utils/categoriesEval");
+const { planetaryBoundaries, SDG, EBF, unitedPlanet } = require("../utils/categoriesEval");
 
 const SQL_query_evaluations = `
   SELECT Items.*, JSONIPFS.json
@@ -21,7 +21,7 @@ const getImageURL = (category, i) => {
 		case "United Planet":
 			return `/img/unitedplanet/up${i}.png`;
 		case "Planetary Boundaries":
-			return "planetary";
+			return "/img/planetary-boundaries.png";
 		default:
 			return "";
 	}
@@ -100,14 +100,26 @@ async function grabEvaluations(staging = false) {
 								Number(evalData[valueKey] ?? 0) !== 0 ||
 								(evalData[commentKey] ?? "") !== ""
 							) {
+								let title = "";
+								switch (category) {
+									case "SDG":
+										title = SDG[i-1];
+										break;
+									case "EBF":
+										title = EBF[i-1];
+										break;
+									case "United Planet":
+										title = unitedPlanet[i-1];
+										break;
+									case "Planetary Boundaries":
+										title = planetaryBoundaries[i-1];
+								}
+
 								justificationArray.push({
 									percentage: Number(evalData[valueKey] ?? 0),
 									comment: evalData[commentKey] ?? "",
 									imageURL: getImageURL(category, i),
-									planetaryBoundary:
-										category === "Planetary Boundaries"
-											? planetaryBoundaries[i]
-											: "",
+									title: title
 								});
 							}
 						}
