@@ -32,7 +32,7 @@ async function sendEmail(clientEmail) {
 		key: process.env.MAILGUN_API_KEY || "key-yourkeyhere",
 	});
 	const data = {
-		from: process.env.MAILGUN_EMAILZ || "your@email.com", // Replace with your email address
+		from: process.env.MAILGUN_EMAIL || "your@email.com", // Replace with your email address
 		to: clientEmail,
 		subject: "Payment Confirmation",
 		text: "Your payment was successful. Thank you for your purchase!",
