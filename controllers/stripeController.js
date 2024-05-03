@@ -4,6 +4,8 @@ const express = require("express");
 const { ethers } = require("ethers");
 const bodyParser = require("body-parser");
 const env = require("dotenv");
+const formData = require("form-data");
+const Mailgun = require("mailgun.js");
 env.config({ path: "./.env" });
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -22,7 +24,43 @@ router.get("/config", (_, res) => {
 		publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
 	});
 });
+async function sendEmail(clientEmail) {
+	// @ts-ignore
+	const mailgun = new Mailgun(formData);
+	const mg = mailgun.client({
+		username: "api",
+		key: process.env.MAILGUN_API_KEY || "key-yourkeyhere",
+	});
+	const data = {
+		from: process.env.MAILGUN_EMAIL || "your@email.com", // Replace with your email address
+		to: clientEmail,
+		subject: "Payment Confirmation",
+		text: "Your payment was successful. Thank you for your purchase!",
+	};
 
+	mg.messages().send(data, function (error, body) {
+		if (error) {
+			console.error("Error sending email:", error);
+		} else {
+			console.log("Email sent successfully:", body);
+		}
+	});
+}
+async function getEmail(paymentIntentId) {
+	try {
+		const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+		const customerId = paymentIntent.customer;
+		if (customerId) {
+			const customer = await stripe.customers.retrieve(customerId);
+			return customer.email;
+		} else {
+			throw new Error("Payment intent does not have an associated customer");
+		}
+	} catch (error) {
+		console.error("Error retrieving email:", error);
+		throw error;
+	}
+}
 async function convertEthToEur(ethPrice) {
 	try {
 		const response = await fetch(
@@ -144,6 +182,12 @@ router.post(
 			// Fulfill any orders, e-mail receipts, etc
 			// To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
 			console.log("💰 Payment captured!");
+			const paymentIntentId = data.object.id;
+			getEmail(paymentIntentId).then((email) => {
+				console.log("Email associated with payment intent:", email);
+				// Now you can send the email to the client
+				sendEmail(email);
+			});
 		} else if (eventType === "payment_intent.payment_failed") {
 			// Cast the event into a PaymentIntent to make use of the types.
 			const pi = data.object;
