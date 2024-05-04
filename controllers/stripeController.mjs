@@ -1,11 +1,12 @@
-const { default: Stripe } = require("stripe");
-const { GENESIS_ABI, GENESIS_ADDRESS } = require("../contracts/min-Genesis");
-const express = require("express");
-const { ethers } = require("ethers");
-const bodyParser = require("body-parser");
-const env = require("dotenv");
-const formData = require("form-data");
-const mailgun = require("mailgun.js");
+import Stripe from "stripe";
+import { GENESIS_ABI, GENESIS_ADDRESS } from "../contracts/min-Genesis.mjs";
+import express from "express";
+import { ethers } from "ethers";
+import bodyParser from "body-parser";
+import env from "dotenv";
+import formData from "form-data";
+import Mailgun from "mailgun.js";
+
 env.config({ path: "./.env" });
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -25,38 +26,47 @@ router.get("/config", (_, res) => {
 	});
 });
 async function sendEmail(clientEmail) {
+	const mailgun = new Mailgun(formData);
 	const mg = mailgun.client({
 		username: "api",
 		key: process.env.MAILGUN_API_KEY || "key-yourkeyhere",
+		url: process.env.EU_ZONE
+			? "https://api.eu.mailgun.net"
+			: "https://api.mailgun.net",
 	});
 	const data = {
-		from: process.env.MAILGUN_EMAIL || "your@email.com", // Replace with your email address
-		to: clientEmail,
+		from: `Payments <${process.env.MAILGUN_EMAIL || "your@email.com"}>`, // Replace with your email address
+		to: [clientEmail],
 		subject: "Payment Confirmation",
 		text: "Your payment was successful. Thank you for your purchase!",
 	};
 
-	mg.messages().send(data, function (error, body) {
+	try {
+		const msg = await mg.messages.create(
+			process.env.MAILGUN_DOMAIN ?? "genesis.re",
+			data
+		);
+		console.log("Email sent successfully:", msg.id);
+	} catch (error) {
+		console.error("Error sending email:", error);
+	}
+	/* mg.messages().send(data, function (error, body) {
 		if (error) {
 			console.error("Error sending email:", error);
 		} else {
 			console.log("Email sent successfully:", body);
 		}
-	});
+	}); */
 }
-
-router.get("/send_email_test", (req, res) => {
-	sendEmail("trifangaby71@gmail.com");
-	res.send("/send_email_test OK");
-});
 
 async function getEmail(paymentIntentId) {
 	try {
 		const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-		const customerId = paymentIntent.customer;
-		if (customerId) {
-			const customer = await stripe.customers.retrieve(customerId);
-			return customer.email;
+		const customer = paymentIntent.customer.toString();
+		if (customer) {
+			const customerRetrieved = await stripe.customers.retrieve(customer);
+			// @ts-ignore
+			return customerRetrieved.email;
 		} else {
 			throw new Error("Payment intent does not have an associated customer");
 		}
@@ -186,6 +196,7 @@ router.post(
 			// Fulfill any orders, e-mail receipts, etc
 			// To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
 			console.log("💰 Payment captured!");
+			//@ts-ignore
 			const paymentIntentId = data.object.id;
 			getEmail(paymentIntentId).then((email) => {
 				console.log("Email associated with payment intent:", email);
@@ -200,4 +211,5 @@ router.post(
 		res.sendStatus(200);
 	}
 );
-module.exports = router;
+
+export default router;

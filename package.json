@@ -5,9 +5,10 @@
     "repository": "https://github.com/GregTrifan/basex-be",
     "author": "Grigore Gabriel Trifan <trifangaby71@protonmail.com>",
     "license": "MIT",
+    "type": "module",
     "scripts": {
-        "dev": "nodemon index.js",
-        "start": "node index.js"
+        "dev": "nodemon --experimental-specifier-resolution=node --experimental-modules index.mjs",
+        "start": "node --experimental-specifier-resolution=node --experimental-modules index.mjs"
     },
     "dependencies": {
         "@vercel/node": "^3.0.5",
@@ -22,6 +23,7 @@
         "stripe": "^14.18.0"
     },
     "devDependencies": {
+        "esm": "^3.2.25",
         "nodemon": "^3.0.1"
     }
 }
