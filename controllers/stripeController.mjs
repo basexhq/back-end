@@ -59,6 +59,12 @@ async function sendEmail(clientEmail) {
 	}); */
 }
 
+
+router.get("/send_email_test", (req, res) => {
+	sendEmail("marsxrobertson@gmail.com");
+	res.send("/send_email_test OK");
+});
+
 async function getEmail(paymentIntentId) {
 	try {
 		const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
