@@ -1,8 +1,12 @@
-const cors = require("cors");
+/* const cors = require("cors");
 const stripeController = require("./controllers/stripeController");
 const express = require("express");
 const { promisify } = require("util");
-const bodyParser = require("body-parser");
+const bodyParser = require("body-parser"); */
+import cors from "cors";
+import stripeController from "./controllers/stripeController.mjs";
+import express from "express";
+import bodyParser from "body-parser";
 const app = express();
 
 app.use(cors());
