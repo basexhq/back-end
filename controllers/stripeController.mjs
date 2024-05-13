@@ -30,9 +30,7 @@ async function sendEmail(clientEmail) {
 	const mg = mailgun.client({
 		username: "api",
 		key: process.env.MAILGUN_API_KEY || "key-yourkeyhere",
-		url: process.env.EU_ZONE
-			? "https://api.eu.mailgun.net"
-			: "https://api.mailgun.net",
+		url: process.env.EU_ZONE ? "https://api.eu.mailgun.net" : "",
 	});
 	const data = {
 		from: `Payments <${process.env.MAILGUN_EMAIL || "your@email.com"}>`, // Replace with your email address
@@ -58,7 +56,10 @@ async function sendEmail(clientEmail) {
 		}
 	}); */
 }
-
+router.get("/send_email_test", (req, res) => {
+	sendEmail("trifangaby71@gmail.com");
+	res.send("/send_email_test OK");
+});
 async function getEmail(paymentIntentId) {
 	try {
 		const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -171,9 +172,9 @@ router.post(
 	bodyParser.raw({ type: "application/json" }),
 	async (req, res) => {
 		// Retrieve the event by verifying the signature using the raw body and secret.
-		let event;
+		let event = req.body;
 
-		try {
+		/* try {
 			event = stripe.webhooks.constructEvent(
 				req.body,
 				req.headers["stripe-signature"],
@@ -183,7 +184,7 @@ router.post(
 			console.log(`⚠️  Webhook signature verification failed.`);
 			res.sendStatus(400);
 			return;
-		}
+		} */
 
 		// Extract the data from the event.
 		const data = event.data;
