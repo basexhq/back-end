@@ -10,7 +10,7 @@ import Mailgun from "mailgun.js";
 env.config({ path: "./.env" });
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-	apiVersion: "2023-10-16",
+	apiVersion: "2024-04-10",
 	appInfo: {
 		// For sample support and debugging, not required for production:
 		name: "Genesis RE",
@@ -189,12 +189,13 @@ router.post(
 		if (eventType === "payment_intent.succeeded") {
 			// Cast the event into a PaymentIntent to make use of the types.
 			const pi = data.object;
+
 			// Funds have been captured
 			// Fulfill any orders, e-mail receipts, etc
 			// To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
 			console.log("💰 Payment captured!");
 			//@ts-ignore
-			const paymentIntentId = data.object.id;
+			const paymentIntentId = pi.id;
 			getEmail(paymentIntentId).then((email) => {
 				console.log("Email associated with payment intent:", email);
 				// Now you can send the email to the client
