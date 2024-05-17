@@ -195,7 +195,7 @@ router.post(
 			// To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
 			console.log("💰 Payment captured!");
 			//@ts-ignore
-			const paymentIntentId = event.id;
+			const paymentIntentId = pi.id;
 			getEmail(paymentIntentId).then((email) => {
 				console.log("Email associated with payment intent:", email);
 				// Now you can send the email to the client
