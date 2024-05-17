@@ -183,11 +183,13 @@ router.post(
 		} */
 
 		// Extract the data from the event.
-		// DEPRECATED EXTRACTION OF THE DATA FROM THE EVENT
-		//  const data = event.data;
+		const data = event.data;
 		const eventType = event.type;
 
 		if (eventType === "payment_intent.succeeded") {
+			// Cast the event into a PaymentIntent to make use of the types.
+			const pi = data.object;
+
 			// Funds have been captured
 			// Fulfill any orders, e-mail receipts, etc
 			// To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
@@ -200,6 +202,8 @@ router.post(
 				sendEmail(email);
 			});
 		} else if (eventType === "payment_intent.payment_failed") {
+			// Cast the event into a PaymentIntent to make use of the types.
+			const pi = data.object;
 			console.log("❌ Payment failed.");
 		}
 		res.sendStatus(200);
